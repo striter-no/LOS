@@ -44,7 +44,7 @@ void compile_lasm(const char *source, const char *output){
         lines[i] = new byte[5]{0};
     }
     cmp_lines(code, lines, instr_count);
-
+    free_marks();
     // Writing to binary file
     write_bin(output, lines, instr_count);
 }
@@ -62,7 +62,6 @@ int main(){
         execute_line(lines[IP]);
     }
     free_lines(lines, cmds_num);
-    free_marks();
 
     std::cout << _i64registers[0] << std::endl;
     std::cout << _i64registers[1] << std::endl;
