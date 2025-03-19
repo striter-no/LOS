@@ -119,20 +119,15 @@ void cmp_from_cstring(const char *str, size_t len, byte outline[5]){
     
     char *word = new char[len + 1]{' '};
     short ki = 0;
-    for (size_t i = 0, li = 0; i < len; ++i) {
+    for (size_t i = 0, li = 0; i < len + 1; ++i) {
         const char &c = str[i];
 
-        if (isspace(c)){
+        if (isspace(c) || c == '\0') {
             word[li] = '\0';
-            // std::cout << "word: " << word << std::endl;
 
             byte val;
             if (ki != 0) val = (int)strtol(word, NULL, 16);
             else val = opcode_map(word);
-            
-            // std::cout << "ki: " << (int)ki << std::endl;
-            // std::cout << "val: " << (int)val << std::endl;
-
 
             switch (ki) {
                 case 0: opcode      = val; break;
@@ -145,11 +140,11 @@ void cmp_from_cstring(const char *str, size_t len, byte outline[5]){
             li = 0;
             
             word = new char[len + 1]{' '};
-            // std::cout << std::endl;
         } else {
             word[li++] = c;
         }
     }
 
+    delete[] word;
     cmp_line(opcode, immdata, destination, source, outline);
 }
