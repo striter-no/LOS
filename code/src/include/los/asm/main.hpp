@@ -27,6 +27,18 @@ using byte = unsigned char;
 
 #define COMANDS_COUNT 2
 
+// 0 - opcode
+// 1 - immdata[0]
+// 2 - immdata[1]
+// 3 - destination register
+// 4 - source register
+
+#define KI_OPCODE 0
+#define KI_IMMDATA_0 1
+#define KI_IMMDATA_1 2
+#define KI_RD 3
+#define KI_RS 4
+
 #define REG 0b00010
 #define ADD 0b00001
 
@@ -98,13 +110,13 @@ byte opcode_map(const char *str){
 int ki_opcode(byte opcode, int ki){
     switch(opcode) {
         case ADD:
-            if (ki == 0) return 1;
-            if (ki == 1) return 2;
-            if (ki == 2) return 3;
+            if (ki == KI_OPCODE) return KI_IMMDATA_0;
+            if (ki == KI_IMMDATA_0) return KI_IMMDATA_1;
+            if (ki == KI_IMMDATA_1) return KI_RD;
             break;
         case REG:
-            if (ki == 0) return 3;
-            if (ki == 3) return 1;
+            if (ki == KI_OPCODE) return KI_RD;
+            if (ki == KI_RD) return KI_IMMDATA_0;
             break;
         default:
             return -1;
@@ -130,11 +142,11 @@ void cmp_from_cstring(const char *str, size_t len, byte outline[5]){
             else val = opcode_map(word);
 
             switch (ki) {
-                case 0: opcode      = val; break;
-                case 1: immdata[0]  = val; break;
-                case 2: immdata[1]  = val; break;
-                case 3: destination = val; break;
-                case 4: source      = val; break;
+                case KI_OPCODE: opcode      = val; break; 
+                case KI_IMMDATA_0: immdata[0]  = val; break; 
+                case KI_IMMDATA_1: immdata[1]  = val; break; 
+                case KI_RD: destination = val; break; 
+                case KI_RS: source      = val; break; 
             }
             ki = ki_opcode(opcode, ki);
             li = 0;
