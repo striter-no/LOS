@@ -1,3 +1,5 @@
-reg r1 0xFF
-reg r2 0xFA
-reg r3 0xFB
+.start
+    reg r1 0xFF
+    reg r2 0xFA
+    reg r3 0xFB
+    hlt

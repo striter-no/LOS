@@ -1,3 +1,15 @@
+#define COMANDS_COUNT 2
+
+#define KI_OPCODE 0
+#define KI_IMMDATA_0 1
+#define KI_IMMDATA_1 2
+#define KI_RD 3
+#define KI_RS 4
+
+#define HLT 0b11111
+#define REG 0b00010
+#define ADD 0b00001
+
 /*
 Registers:
 R0-R32
@@ -22,25 +34,12 @@ Operations
 #include <iostream>
 using byte = unsigned char;
 
-#define COMANDS_COUNT 2
-
-#define KI_OPCODE 0
-#define KI_IMMDATA_0 1
-#define KI_IMMDATA_1 2
-#define KI_RD 3
-#define KI_RS 4
-
-#define REG 0b00010
-#define ADD 0b00001
-
-__int64_t _64registers[32] = {0};
-
-void add(byte a, byte b, byte c) { _64registers[c] = _64registers[a] + _64registers[b]; }
-void reg(byte a, const __int64_t &value) { _64registers[a] = value; }
-
-__int64_t commands[COMANDS_COUNT]{
-    ADD, REG
+struct mark {
+    char *label;
+    int addr;
 };
+
+mark marks[100];
 
 /*
 Working version:
@@ -76,6 +75,26 @@ void rev_line(byte *opcode, byte immdata[2], byte *destination, byte *source, by
     *source = in[4];
 }
 
+mark findMark(const char *label){
+    for(int i = 0; i < 100; ++i) {
+        if (marks[i].label && strcmp(marks[i].label, label) == 0) {
+            return marks[i];
+        }
+    }
+    return {};
+}
+
+
+bool HALT = false;
+__int64_t _i64registers[32] = {0};
+long long IP = 0;
+
+void hlt()                               { HALT = true; }
+void add(byte a, byte b, byte c)         { _i64registers[c] = _i64registers[a] + _i64registers[b]; }
+void sub(byte a, byte b, byte c)         { _i64registers[c] = _i64registers[a] - _i64registers[b]; }
+void reg(byte a, const __int64_t &value) { _i64registers[a] = value; }
+
+
 void execute_line(byte line[5]){
     byte opcode, immdata[2], destination, source;
     rev_line(&opcode, immdata, &destination, &source, line);
@@ -83,38 +102,26 @@ void execute_line(byte line[5]){
     switch (opcode) {
         case ADD:
             add(destination, source, destination);
+            IP++;
             break;
         case REG:
             reg(destination, immdata[0]);
+            IP++;
+            break;
+        case HLT:
+            hlt();
+            IP++;
             break;
         default:
             break;
     }
 }
 
-byte reg_map(const char *str){
-    if (str[0] != 'r') return -1;
-    const char *p = str + 1;
-    return atoi(p);
-}
-
 byte opcode_map(const char *str){
     if (strcmp(str, "add") == 0) return ADD;
     if (strcmp(str, "reg") == 0) return REG;
+    if (strcmp(str, "hlt") == 0) return HLT;
     return -1;
-}
-
-int smart_stoi(const char *str){
-    int base = 10;
-    if (str[0] == '0' && (str[1] == 'x' || str[1] == 'X')) {
-        base = 16;
-    } else if (str[0] == '0' && (str[1] == 'b' || str[1] == 'B')) {
-        base = 2;
-    } else if (str[0] == '0') {
-        base = 8;
-    }
-
-    return strtol(str, NULL, base);
 }
 
 int ki_opcode(byte opcode, int ki){
@@ -128,9 +135,38 @@ int ki_opcode(byte opcode, int ki){
             if (ki == KI_OPCODE) return KI_RD;
             if (ki == KI_RD) return KI_IMMDATA_0;
             break;
+        case HLT:
+            return -1;
         default:
             return -1;
     }
+}
+
+byte reg_map(const char *str){
+    if (str[0] != 'r') return -1;
+    const char *p = str + 1;
+    return atoi(p);
+}
+
+int count(const char *str, char c) {
+    int count = 0;
+    while (*str) {
+        if (*str++ == c) count++;
+    }
+    return count;
+}
+
+int smart_stoi(const char *str){
+    int base = 10;
+    if (str[0] == '0' && (str[1] == 'x' || str[1] == 'X')) {
+        base = 16;
+    } else if (str[0] == '0' && (str[1] == 'b' || str[1] == 'B')) {
+        base = 2;
+    } else if (str[0] == '0') {
+        base = 8;
+    }
+
+    return strtol(str, NULL, base);
 }
 
 /*
@@ -170,4 +206,60 @@ void cmp_from_cstring(const char *str, size_t len, byte outline[5]){
 
     delete[] word;
     cmp_line(opcode, immdata, destination, source, outline);
+}
+
+void cmp_lines(const char *code, byte **lines, int &instr_count){
+    char *codeline = new char[50]{' '};
+    int spaces = 0;
+    bool onlyspaces = true, mark = false;
+    int len = strlen(code);
+    for (int i = 0, li = 0, nl = 0; i < len + 1; ++i) {
+        if (li == 0 && code[i] == '.'){
+            mark = true;
+            continue;
+        }
+        if (isspace(code[i]) && onlyspaces){
+            spaces++;
+        } else if (onlyspaces && !isspace(code[i]) || !onlyspaces) {
+            onlyspaces = false;
+            if (code[i] == '\n' || code[i] == '\0') {
+                codeline[li] = '\0';
+                if (mark) {
+                    marks[nl].label = new char[strlen(codeline) + 1];
+                    strcpy(marks[nl].label, &codeline[0]);
+                    marks[nl].addr = nl;
+                    mark = false;
+
+                } else {
+                    cmp_from_cstring(codeline, strlen(codeline), lines[nl]);
+                    instr_count++;
+                    nl++;
+                }
+                codeline = new char[50]{' '};
+                li = 0; spaces = 0;
+            } else {
+                codeline[li++] = code[i];
+            }
+        }
+
+        if (code[i] == '\n' || code[i] == '\0') {
+            onlyspaces = true;
+        }
+    }
+
+    delete[] codeline;
+}
+
+void free_lines(byte **lines, int count){
+    for (int i = 0; i < count; ++i) {
+        delete[] lines[i];
+    }
+    delete[] lines;
+}
+
+void free_marks(){
+    for (int i = 0; i < 100; ++i) {
+        if (marks[i].label) 
+            delete[] marks[i].label;
+    }
 }
