@@ -8,9 +8,6 @@ R0-R32
 Operations
 
 1. Registers
-    mov r0, r1 - Copy value from R1 to R0
-    reg r0, VALUE - Store value in R0
-
 2. Arithmetics
 3. Boolean operations
 4. Bit manipulation
@@ -26,12 +23,6 @@ Operations
 using byte = unsigned char;
 
 #define COMANDS_COUNT 2
-
-// 0 - opcode
-// 1 - immdata[0]
-// 2 - immdata[1]
-// 3 - destination register
-// 4 - source register
 
 #define KI_OPCODE 0
 #define KI_IMMDATA_0 1
@@ -101,10 +92,29 @@ void execute_line(byte line[5]){
     }
 }
 
+byte reg_map(const char *str){
+    if (str[0] != 'r') return -1;
+    const char *p = str + 1;
+    return atoi(p);
+}
+
 byte opcode_map(const char *str){
     if (strcmp(str, "add") == 0) return ADD;
     if (strcmp(str, "reg") == 0) return REG;
     return -1;
+}
+
+int smart_stoi(const char *str){
+    int base = 10;
+    if (str[0] == '0' && (str[1] == 'x' || str[1] == 'X')) {
+        base = 16;
+    } else if (str[0] == '0' && (str[1] == 'b' || str[1] == 'B')) {
+        base = 2;
+    } else if (str[0] == '0') {
+        base = 8;
+    }
+
+    return strtol(str, NULL, base);
 }
 
 int ki_opcode(byte opcode, int ki){
@@ -138,7 +148,8 @@ void cmp_from_cstring(const char *str, size_t len, byte outline[5]){
             word[li] = '\0';
 
             byte val;
-            if (ki != 0) val = (int)strtol(word, NULL, 16);
+            if (ki == KI_RD || ki == KI_RS) val = reg_map(word);
+            else if (ki != KI_OPCODE) val = smart_stoi(word);
             else val = opcode_map(word);
 
             switch (ki) {
