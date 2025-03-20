@@ -25,38 +25,38 @@ Operations
 
 #define HLT 0b11111 // +
 
-#define ABS 0b01111
 
-#define XORU 0b10100
-#define ORU  0b10011
-#define ANDU 0b10010
+#define XORU HLT-1 // +
+#define ORU  XORU-1 // +
+#define ANDU ORU-1 // +
 
-#define NOT 0b10001
-#define XOR 0b10000
-#define OR  0b01111
-#define AND 0b01110
+#define XOR ANDU-1 // +
+#define OR  XOR-1 // +
+#define AND OR-1 // +
 
-#define BLSU 0b01101
-#define BGRU 0b01100
+#define BLSU AND-1 // +
+#define BGRU BLSU-1 // +
 
-#define BLS 0b01010
-#define BGR 0b01001
-#define BEQ 0b01000
+#define BLS BGRU-1 // +
+#define BGR BLS-1 // +
+#define BNE BGR-1 // +
+#define BEQ BNE-1 // +
 
-#define STORE 0b00111
-#define LOAD  0b00110
+#define STORE BEQ-1 // +
+#define LOAD  STORE-1 // +
 
-#define LSH 0b00101
-#define RSH 0b00100
-#define SUB 0b00011
-#define ADD 0b00001 // +
+#define LSH LOAD-1 // +
+#define RSH LSH-1 // +
+#define SUB RSH-1 // +
+#define ADD SUB-1 // +
 
-#define REG 0b00010 // +
+#define REG ADD-1 // +
 
 #include <ctype.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stddef.h>
+#include <stdlib.h>
 #include <iostream>
 using byte = unsigned char;
 
@@ -66,6 +66,7 @@ struct mark {
 };
 
 mark marks[100];
+int64_t dinamic_memory[1000];
 
 /*
 Working version:
@@ -115,12 +116,25 @@ bool HALT = false;
 __int64_t _i64registers[32] = {0};
 long long IP = 0;
 
-void hlt()                               { HALT = true; }
+void hlt()                                  { HALT = true; }
 
-void bls(byte a, byte b, const char *c) { if (_i64registers[a] < _i64registers[b]) IP = findMark(c).addr; }
-void bgr(byte a, byte b, const char *c) { if (_i64registers[a] > _i64registers[b]) IP = findMark(c).addr; }
-void bnq(byte a, byte b, const char *c) { if (_i64registers[a] != _i64registers[b]) IP = findMark(c).addr; }
-void beq(byte a, byte b, const char *c) { if (_i64registers[a] == _i64registers[b]) IP = findMark(c).addr; }
+void store(byte reg, long long address){ dinamic_memory[address] = _i64registers[reg]; }
+void load (byte reg, long long address){ _i64registers[reg] = dinamic_memory[address]; }
+
+void bit_xoru(byte a, byte b, byte c){ _i64registers[c] = abs(a) ^ abs(b); }
+void bit_oru (byte a, byte b, byte c){ _i64registers[c] = abs(a) | abs(b); }
+void bit_andu(byte a, byte b, byte c){ _i64registers[c] = abs(a) & abs(b); }
+
+void bit_xor(byte a, byte b, byte c){ _i64registers[c] = a ^ b; }
+void bit_or (byte a, byte b, byte c){ _i64registers[c] = a | b; }
+void bit_and(byte a, byte b, byte c){ _i64registers[c] = a & b; }
+
+void blsu(byte a, byte b, long long address) { if (abs(_i64registers[a]) < abs(_i64registers[b])) IP = address; }
+void bgru(byte a, byte b, long long address) { if (abs(_i64registers[a]) > abs(_i64registers[b])) IP = address; }
+
+void bls(byte a, byte b, long long address) { if (_i64registers[a] < _i64registers[b]) IP = address; }
+void bgr(byte a, byte b, long long address) { if (_i64registers[a] > _i64registers[b]) IP = address; }
+void beq(byte a, byte b, long long address) { if (_i64registers[a] == _i64registers[b]) IP = address; }
 
 void lsh(byte a, byte b, byte c) { _i64registers[c] = _i64registers[a] << _i64registers[b]; }
 void rsh(byte a, byte b, byte c) { _i64registers[c] = _i64registers[a] >> _i64registers[b]; }
@@ -135,8 +149,67 @@ void execute_line(byte line[5]){
     rev_line(&opcode, immdata, &destination, &source, line);
 
     switch (opcode) {
+        case STORE:
+            store(source, _i64registers[immdata[0]]);
+            IP++;
+            break;
+        case LOAD:
+            load(destination, _i64registers[immdata[0]]);
+            IP++;
+            break;
+        case ANDU:
+            bit_andu(immdata[0], immdata[1], destination);
+            IP++;
+            break;
+        case XORU:
+            bit_xoru(immdata[0], immdata[1], destination);
+            IP++;
+            break;
+        case ORU:
+            bit_oru(immdata[0], immdata[1], destination);
+            IP++;
+            break;
+        case AND:
+            bit_and(immdata[0], immdata[1], destination);
+            IP++;
+            break;
+        case XOR:
+            bit_xor(immdata[0], immdata[1], destination);
+            IP++;
+            break;
+        case OR:
+            bit_or(immdata[0], immdata[1], destination);
+            IP++;
+            break;
+        case BLSU:
+            blsu(source, destination, immdata[0]);
+            break;
+        case BGRU:
+            bgru(source, destination, immdata[0]);
+            break;
+        case BLS:
+            bls(source, destination, immdata[0]);
+            break;
+        case BGR:
+            bgr(source, destination, immdata[0]);
+            break;
+        case BEQ:
+            beq(source, destination, immdata[0]);
+            break;
         case ADD:
             add(immdata[0], immdata[1], destination);
+            IP++;
+            break;
+        case SUB:
+            sub(immdata[0], immdata[1], destination);
+            IP++;
+            break;
+        case RSH:
+            rsh(immdata[0], immdata[1], destination);
+            IP++;
+            break;
+        case LSH:
+            lsh(immdata[0], immdata[1], destination);
             IP++;
             break;
         case REG:
@@ -156,12 +229,106 @@ byte opcode_map(const char *str){
     if (strcmp(str, "add") == 0) return ADD;
     if (strcmp(str, "reg") == 0) return REG;
     if (strcmp(str, "hlt") == 0) return HLT;
+    if (strcmp(str, "xoru") == 0) return XORU;
+    if (strcmp(str, "oru") == 0)  return ORU;
+    if (strcmp(str, "andu") == 0) return ANDU;
+    if (strcmp(str, "xor") == 0)  return XOR;
+    if (strcmp(str, "or") == 0)   return OR;
+    if (strcmp(str, "and") == 0)  return AND;
+    if (strcmp(str, "blsu") == 0) return BLSU;
+    if (strcmp(str, "bgru") == 0) return BGRU;
+    if (strcmp(str, "bls") == 0) return BLS;
+    if (strcmp(str, "bgr") == 0) return BGR;
+    if (strcmp(str, "beq") == 0) return BEQ;
+    if (strcmp(str, "st") == 0)  return STORE;
+    if (strcmp(str, "ld") == 0)  return LOAD;
+    if (strcmp(str, "ls") == 0)  return LSH;
+    if (strcmp(str, "rs") == 0)  return RSH;
+    if (strcmp(str, "sub") == 0) return SUB;
     std::cerr << "Unknown opcode: " << str << std::endl;
     return -1;
 }
 
 int ki_opcode(byte opcode, int ki){
     switch(opcode) {
+        case XORU:
+            if (ki == KI_OPCODE) return KI_IMMDATA_0;
+            if (ki == KI_IMMDATA_0) return KI_IMMDATA_1;
+            if (ki == KI_IMMDATA_1) return KI_RD;
+            break;
+        case ORU:
+            if (ki == KI_OPCODE) return KI_IMMDATA_0;
+            if (ki == KI_IMMDATA_0) return KI_IMMDATA_1;
+            if (ki == KI_IMMDATA_1) return KI_RD;
+            break;
+        case ANDU:
+            if (ki == KI_OPCODE) return KI_IMMDATA_0;
+            if (ki == KI_IMMDATA_0) return KI_IMMDATA_1;
+            if (ki == KI_IMMDATA_1) return KI_RD;
+            break;
+        case XOR:
+            if (ki == KI_OPCODE) return KI_IMMDATA_0;
+            if (ki == KI_IMMDATA_0) return KI_IMMDATA_1;
+            if (ki == KI_IMMDATA_1) return KI_RD;
+            break;
+        case OR:
+            if (ki == KI_OPCODE) return KI_IMMDATA_0;
+            if (ki == KI_IMMDATA_0) return KI_IMMDATA_1;
+            if (ki == KI_IMMDATA_1) return KI_RD;
+            break;
+        case AND:
+            if (ki == KI_OPCODE) return KI_IMMDATA_0;
+            if (ki == KI_IMMDATA_0) return KI_IMMDATA_1;
+            if (ki == KI_IMMDATA_1) return KI_RD;
+            break;
+        case BLSU:
+            if (ki == KI_OPCODE) return KI_RS;
+            if (ki == KI_RS) return KI_RD;
+            if (ki == KI_RD) return KI_IMMDATA_0;
+            break;
+        case BGRU:
+            if (ki == KI_OPCODE) return KI_RS;
+            if (ki == KI_RS) return KI_RD;
+            if (ki == KI_RD) return KI_IMMDATA_0;
+            break;
+        case BLS:
+            if (ki == KI_OPCODE) return KI_RS;
+            if (ki == KI_RS) return KI_RD;
+            if (ki == KI_RD) return KI_IMMDATA_0;
+            break;
+        case BGR:
+            if (ki == KI_OPCODE) return KI_RS;
+            if (ki == KI_RS) return KI_RD;
+            if (ki == KI_RD) return KI_IMMDATA_0;
+            break;
+        case BEQ:
+            if (ki == KI_OPCODE) return KI_RS;
+            if (ki == KI_RS) return KI_RD;
+            if (ki == KI_RD) return KI_IMMDATA_0;
+            break;
+        case STORE:
+            if (ki == KI_OPCODE) return KI_RS;
+            if (ki == KI_RS) return KI_IMMDATA_0;
+            break;
+        case LOAD:
+            if (ki == KI_OPCODE) return KI_RD;
+            if (ki == KI_RD) return KI_IMMDATA_0;
+            break;
+        case LSH:
+            if (ki == KI_OPCODE) return KI_IMMDATA_0;
+            if (ki == KI_IMMDATA_0) return KI_IMMDATA_1;
+            if (ki == KI_IMMDATA_1) return KI_RD;
+            break;
+        case RSH:
+            if (ki == KI_OPCODE) return KI_IMMDATA_0;
+            if (ki == KI_IMMDATA_0) return KI_IMMDATA_1;
+            if (ki == KI_IMMDATA_1) return KI_RD;
+            break;
+        case SUB:
+            if (ki == KI_OPCODE) return KI_IMMDATA_0;
+            if (ki == KI_IMMDATA_0) return KI_IMMDATA_1;
+            if (ki == KI_IMMDATA_1) return KI_RD;
+            break;
         case ADD:
             if (ki == KI_OPCODE) return KI_IMMDATA_0;
             if (ki == KI_IMMDATA_0) return KI_IMMDATA_1;
@@ -228,9 +395,14 @@ void cmp_from_cstring(const char *str, size_t len, byte outline[5]){
             
             bool val_registr = false;
             byte val;
-            if (ki == KI_RD || ki == KI_RS) val = reg_map(word, val_registr);
-            else if (ki != KI_OPCODE) val = smart_stoi(word);
-            else val = opcode_map(word);
+
+            if (ki == KI_IMMDATA_0 && opcode >= BEQ && opcode <= BLSU) {
+                val = findMark(word).addr;
+            } else {
+                if (ki == KI_RD || ki == KI_RS) val = reg_map(word, val_registr);
+                else if (ki != KI_OPCODE) val = smart_stoi(word);
+                else val = opcode_map(word);
+            }
 
             switch (ki) {
                 case KI_OPCODE: opcode      = val; break; 

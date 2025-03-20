@@ -4,3 +4,7 @@
     reg r3 0xFB
     add r1 r0 r2
     hlt
+
+.mark1:
+    add r1 r0 r3
+    
