@@ -1,5 +1,6 @@
 .start
-    reg r1 0xFF
+    reg r1 0x12
     reg r2 0xFA
     reg r3 0xFB
+    add r1 r0 r2
     hlt

@@ -1,15 +1,3 @@
-#define COMANDS_COUNT 2
-
-#define KI_OPCODE 0
-#define KI_IMMDATA_0 1
-#define KI_IMMDATA_1 2
-#define KI_RD 3
-#define KI_RS 4
-
-#define HLT 0b11111
-#define REG 0b00010
-#define ADD 0b00001
-
 /*
 Registers:
 R0-R32
@@ -27,6 +15,44 @@ Operations
 6. Branching
 
 */
+#define COMANDS_COUNT 2
+
+#define KI_OPCODE 0
+#define KI_IMMDATA_0 1
+#define KI_IMMDATA_1 2
+#define KI_RD 3
+#define KI_RS 4
+
+#define HLT 0b11111 // +
+
+#define ABS 0b01111
+
+#define XORU 0b10100
+#define ORU  0b10011
+#define ANDU 0b10010
+
+#define NOT 0b10001
+#define XOR 0b10000
+#define OR  0b01111
+#define AND 0b01110
+
+#define BLSU 0b01101
+#define BGRU 0b01100
+
+#define BLS 0b01010
+#define BGR 0b01001
+#define BEQ 0b01000
+
+#define STORE 0b00111
+#define LOAD  0b00110
+
+#define LSH 0b00101
+#define RSH 0b00100
+#define SUB 0b00011
+#define ADD 0b00001 // +
+
+#define REG 0b00010 // +
+
 #include <ctype.h>
 #include <string.h>
 #include <stdlib.h>
@@ -90,8 +116,17 @@ __int64_t _i64registers[32] = {0};
 long long IP = 0;
 
 void hlt()                               { HALT = true; }
-void add(byte a, byte b, byte c)         { _i64registers[c] = _i64registers[a] + _i64registers[b]; }
-void sub(byte a, byte b, byte c)         { _i64registers[c] = _i64registers[a] - _i64registers[b]; }
+
+void bls(byte a, byte b, const char *c) { if (_i64registers[a] < _i64registers[b]) IP = findMark(c).addr; }
+void bgr(byte a, byte b, const char *c) { if (_i64registers[a] > _i64registers[b]) IP = findMark(c).addr; }
+void bnq(byte a, byte b, const char *c) { if (_i64registers[a] != _i64registers[b]) IP = findMark(c).addr; }
+void beq(byte a, byte b, const char *c) { if (_i64registers[a] == _i64registers[b]) IP = findMark(c).addr; }
+
+void lsh(byte a, byte b, byte c) { _i64registers[c] = _i64registers[a] << _i64registers[b]; }
+void rsh(byte a, byte b, byte c) { _i64registers[c] = _i64registers[a] >> _i64registers[b]; }
+void add(byte a, byte b, byte c) { _i64registers[c] = _i64registers[a] + _i64registers[b]; }
+void sub(byte a, byte b, byte c) { _i64registers[c] = _i64registers[a] - _i64registers[b]; }
+
 void reg(byte a, const __int64_t &value) { _i64registers[a] = value; }
 
 
@@ -101,7 +136,7 @@ void execute_line(byte line[5]){
 
     switch (opcode) {
         case ADD:
-            add(destination, source, destination);
+            add(immdata[0], immdata[1], destination);
             IP++;
             break;
         case REG:
@@ -121,6 +156,7 @@ byte opcode_map(const char *str){
     if (strcmp(str, "add") == 0) return ADD;
     if (strcmp(str, "reg") == 0) return REG;
     if (strcmp(str, "hlt") == 0) return HLT;
+    std::cerr << "Unknown opcode: " << str << std::endl;
     return -1;
 }
 
@@ -142,9 +178,11 @@ int ki_opcode(byte opcode, int ki){
     }
 }
 
-byte reg_map(const char *str){
+byte reg_map(const char *str, bool &ok){
+    ok = false;
     if (str[0] != 'r') return -1;
     const char *p = str + 1;
+    ok = true;
     return atoi(p);
 }
 
@@ -158,6 +196,11 @@ int count(const char *str, char c) {
 
 int smart_stoi(const char *str){
     int base = 10;
+    bool registered = false;
+    byte reg_guess = reg_map(str, registered);
+    
+    if (registered) return reg_guess;
+
     if (str[0] == '0' && (str[1] == 'x' || str[1] == 'X')) {
         base = 16;
     } else if (str[0] == '0' && (str[1] == 'b' || str[1] == 'B')) {
@@ -165,7 +208,7 @@ int smart_stoi(const char *str){
     } else if (str[0] == '0') {
         base = 8;
     }
-
+    
     return strtol(str, NULL, base);
 }
 
@@ -182,9 +225,10 @@ void cmp_from_cstring(const char *str, size_t len, byte outline[5]){
 
         if (isspace(c) || c == '\0') {
             word[li] = '\0';
-
+            
+            bool val_registr = false;
             byte val;
-            if (ki == KI_RD || ki == KI_RS) val = reg_map(word);
+            if (ki == KI_RD || ki == KI_RS) val = reg_map(word, val_registr);
             else if (ki != KI_OPCODE) val = smart_stoi(word);
             else val = opcode_map(word);
 
